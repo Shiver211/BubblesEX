@@ -36,6 +36,7 @@ import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.*;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
+import net.minecraftforge.fml.relauncher.FMLLaunchHandler;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.apache.logging.log4j.LogManager;
@@ -122,6 +123,10 @@ public class Baubles {
         ModelLoader.setCustomModelResourceLocation(CREEPER_CAST, 0, new ModelResourceLocation(Objects.requireNonNull(CREEPER_CAST.getRegistryName()), "inventory"));
     }
 
+    public static boolean isDev() {
+        return FMLLaunchHandler.isDeobfuscatedEnvironment();
+    }
+
     static {
         ResourceLocation MAX_VERSTAPPEN_LOCATION = new ResourceLocation(MODID, "max_verstappen");
         ResourceLocation CREEPER_CAST_LOCATION = new ResourceLocation(MODID, "creeper_cast");
@@ -146,6 +151,22 @@ public class Baubles {
                 if (!world.isRemote) {
                     player.addPotionEffect(new PotionEffect(MobEffects.REGENERATION, 30));
                 }
+            }
+
+            @Override
+            public void onEquipped(ItemStack itemstack, EntityLivingBase player) {
+                World world = player.world;
+//                if (!world.isRemote) {
+                    System.out.println("111");
+//                }
+            }
+
+            @Override
+            public void onUnequipped(ItemStack itemstack, EntityLivingBase player) {
+                World world = player.world;
+//                if (!world.isRemote) {
+                    System.out.println("222");
+//                }
             }
 
         }.setRegistryName(CREEPER_CAST_LOCATION).setTranslationKey(MODID + ".creeper_cast").setCreativeTab(CreativeTabs.MISC);

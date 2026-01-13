@@ -3,7 +3,6 @@
   "refmap": "mixins.baubles.refmap.json",
   "mixins": [
     "botania.MixinItemBauble",
-    "botania.MixinTravelBelt",
     "qualitytools.MixinBaublesHandler",
     "wings.MixinItemWings"
   ],

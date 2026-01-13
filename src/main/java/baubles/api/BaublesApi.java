@@ -3,10 +3,20 @@ package baubles.api;
 import baubles.api.cap.BaublesCapabilities;
 import baubles.api.cap.IBaublesItemHandler;
 import baubles.api.inv.BaublesInventoryWrapper;
+import baubles.api.inv.SlotDefinition;
+import baubles.common.Baubles;
+import baubles.common.Config;
+import baubles.common.init.SlotDefinitions;
+import baubles.common.network.PacketAddSlot;
+import baubles.common.network.PacketHandler;
+import baubles.common.network.PacketRemoveSlot;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.TextComponentTranslation;
 
 import javax.annotation.Nullable;
 import java.util.Objects;
@@ -52,5 +62,40 @@ public class BaublesApi {
     @Nullable
     public static IBauble getBauble(ItemStack stack) {
         return stack.getCapability(BaublesCapabilities.CAPABILITY_ITEM_BAUBLE, null);
+    }
+
+
+    public static boolean removePlayerSlot(EntityPlayerMP player, String typeName) {
+        ResourceLocation location;
+        if (!typeName.contains(":")) location = new ResourceLocation(Baubles.MODID, typeName);
+        else location = new ResourceLocation(typeName);
+        SlotDefinition definition = SlotDefinitions.get(location);
+
+        PacketHandler.INSTANCE.sendTo(new PacketRemoveSlot(player, typeName), player);
+        return BaublesApi.getBaublesHandler(player).removeSlot(definition);
+    }
+
+    public static boolean addPlayerSlot(EntityPlayerMP player, String typeName) {
+        ResourceLocation location;
+        if (!typeName.contains(":")) location = new ResourceLocation(Baubles.MODID, typeName);
+        else location = new ResourceLocation(typeName);
+        SlotDefinition definition = SlotDefinitions.get(location);
+
+        if (!checkPlayerBaublesIsFull(player)) {
+            PacketHandler.INSTANCE.sendTo(new PacketAddSlot(player, typeName), player);
+            return BaublesApi.getBaublesHandler(player).addSlot(definition);
+        }
+
+        return false;
+    }
+
+    public static boolean checkPlayerBaublesIsFull(EntityPlayerMP entityPlayerMP) {
+        IBaublesItemHandler iBaublesItemHandler = BaublesApi.getBaublesHandler(entityPlayerMP);
+        boolean isFull = true;
+        for (int i = 0; i < Config.slotMaxNum; i++) {
+            SlotDefinition slotDefinition = iBaublesItemHandler.getRealSlot(i);
+            if (slotDefinition == null) isFull = false;
+        }
+        return isFull;
     }
 }

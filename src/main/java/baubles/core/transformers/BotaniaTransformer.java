@@ -1,9 +1,23 @@
 package baubles.core.transformers;
 
+import baubles.api.BaubleType;
+import baubles.api.BaublesApi;
+import baubles.common.Baubles;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.event.entity.living.LivingEvent;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
+import vazkii.botania.api.mana.ManaItemHandler;
+import vazkii.botania.common.item.ModItems;
+import vazkii.botania.common.item.equipment.bauble.ItemTravelBelt;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Botania has some items that gets item from specific bauble slots.
@@ -156,107 +170,86 @@ public class BotaniaTransformer extends BaseTransformer {
         ClassNode cls = read(basicClass);
         for (MethodNode method : cls.methods) {
 
-            if (method.name.equals("updatePlayerStepStatus")) {
-                Iterator<AbstractInsnNode> iterator = method.instructions.iterator();
-                while (iterator.hasNext()) {
-                    AbstractInsnNode node = iterator.next();
-                    if (node.getOpcode() == INVOKEINTERFACE) {
-                            method.instructions.remove(node.getPrevious());
-                            method.instructions.remove(node);
+            if (method.name.equals("onPlayerJump")) {
 
-                            InsnList list = new InsnList();
-                            LabelNode elseIfLabel = new LabelNode();
-                            LabelNode elseLabel = new LabelNode();
-                            LabelNode endLabel = new LabelNode();
+                method.instructions.clear();
+                method.tryCatchBlocks.clear();
+                method.localVariables.clear();
 
-                            list.add(new VarInsnNode(ALOAD, 1));
-                            list.add(new MethodInsnNode(INVOKESTATIC, "baubles/api/BaublesApi", "getBaublesHandler", "(Lnet/minecraft/entity/player/EntityPlayer;)Lbaubles/api/cap/IBaublesItemHandler;", false));
+                InsnList insn = new InsnList();
 
-                            list.add(new VarInsnNode(ALOAD, 0));
-                            list.add(new TypeInsnNode(INSTANCEOF, "vazkii/botania/common/item/equipment/bauble/ItemSuperTravelBelt"));
-                            list.add(new JumpInsnNode(IFEQ, elseIfLabel));
+                insn.add(new VarInsnNode(ALOAD, 0));
+                insn.add(new VarInsnNode(ALOAD, 1));
+                insn.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                        "baubles/core/transformers/BotaniaTransformer",
+                        "onPlayerJump",
+                        "(Lnet/minecraftforge/event/entity/living/LivingEvent$LivingJumpEvent;)V",
+                        false));
+                insn.add(new InsnNode(RETURN));
 
-                            list.add(new VarInsnNode(ALOAD, 1));
-                            list.add(new TypeInsnNode(NEW, "vazkii/botania/common/item/equipment/bauble/ItemSuperTravelBelt"));
-                            list.add(new InsnNode(DUP));
-                            list.add(new MethodInsnNode(INVOKESPECIAL, "vazkii/botania/common/item/equipment/bauble/ItemSuperTravelBelt", "<init>", "()V", false));
-                            list.add(new MethodInsnNode(INVOKESTATIC, "baubles/api/BaublesApi", "isBaubleEquipped", "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I", false));
-                            list.add(new VarInsnNode(ALOAD, 1));
-                            list.add(new MethodInsnNode(INVOKEINTERFACE, "baubles/api/cap/IBaublesItemHandler", "getStackInSlot", "(I)Lnet/minecraft/item/ItemStack;", true));
-                            list.add(new VarInsnNode(ASTORE, 4));
-                            list.add(new JumpInsnNode(GOTO, endLabel));
+                method.instructions = insn;
 
-                            list.add(elseIfLabel);
-                            list.add(new FrameNode(Opcodes.F_APPEND, 1, new Object[]{"net/minecraft/item/ItemStack"}, 0, null));
-
-                            list.add(new VarInsnNode(ALOAD, 0));
-                            list.add(new TypeInsnNode(INSTANCEOF, "vazkii/botania/common/item/equipment/bauble/ItemSpeedUpBelt"));
-                            list.add(new JumpInsnNode(IFEQ, elseLabel));
-
-                            list.add(new VarInsnNode(ALOAD, 1)); // player
-                            list.add(new TypeInsnNode(NEW, "vazkii/botania/common/item/equipment/bauble/ItemSpeedUpBelt"));
-                            list.add(new InsnNode(DUP));
-                            list.add(new MethodInsnNode(INVOKESPECIAL, "vazkii/botania/common/item/equipment/bauble/ItemSpeedUpBelt", "<init>", "()V", false));
-                            list.add(new MethodInsnNode(INVOKESTATIC, "baubles/api/BaublesApi", "isBaubleEquipped", "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I", false));
-                            list.add(new VarInsnNode(ALOAD, 1)); // player
-                            list.add(new MethodInsnNode(INVOKEINTERFACE, "baubles/api/cap/IBaublesItemHandler", "getStackInSlot", "(I)Lnet/minecraft/item/ItemStack;", true));
-                            list.add(new VarInsnNode(ASTORE, 4)); // 存入 belt
-                            list.add(new JumpInsnNode(GOTO, endLabel));
-
-                            list.add(elseLabel);
-                            list.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
-
-                            list.add(new VarInsnNode(ALOAD, 1));
-                            list.add(new VarInsnNode(ALOAD, 0));
-                            list.add(new MethodInsnNode(INVOKESTATIC, "baubles/api/BaublesApi", "isBaubleEquipped", "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I", false));
-                            list.add(new VarInsnNode(ALOAD, 1));
-                            list.add(new MethodInsnNode(INVOKEINTERFACE, "baubles/api/cap/IBaublesItemHandler", "getStackInSlot", "(I)Lnet/minecraft/item/ItemStack;", true));
-                            list.add(new VarInsnNode(ASTORE, 4));
-
-                            list.add(endLabel);
-                            list.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
-
-                            method.instructions.insert(node, list);
-                            break;
-//                        }
-
-
-                    }
-                }
-
-
-            }
-            else
-                if (method.name.equals("onPlayerJump")) {
-                Iterator<AbstractInsnNode> iterator = method.instructions.iterator();
-                while (iterator.hasNext()) {
-                    AbstractInsnNode node = iterator.next();
-                    if (node.getOpcode() == INVOKEINTERFACE) {
-                        method.instructions.remove(node.getPrevious());
-                        InsnList list = new InsnList();
-                        list.add(new VarInsnNode(ALOAD, 2));
-                        list.add(new VarInsnNode(ALOAD, 0));
-                        list.add(new MethodInsnNode(INVOKESTATIC, "baubles/api/BaublesApi", "isBaubleEquipped", "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I", false));
-                        method.instructions.insertBefore(node, list);
-                        break;
-                    }
-                }
+                method.maxStack = 0;
+                method.maxLocals = 0;
             }
             else if (method.name.equals("shouldPlayerHaveStepup")) {
                 Iterator<AbstractInsnNode> iterator = method.instructions.iterator();
                 while (iterator.hasNext()) {
                     AbstractInsnNode node = iterator.next();
                     if (node.getOpcode() == INVOKEINTERFACE) {
-                        method.instructions.remove(node.getPrevious());
-                        InsnList list = new InsnList();
-                        list.add(new VarInsnNode(ALOAD, 1));
-                        list.add(new VarInsnNode(ALOAD, 0));
-                        list.add(new MethodInsnNode(INVOKESTATIC, "baubles/api/BaublesApi", "isBaubleEquipped", "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I", false));
-                        method.instructions.insertBefore(node, list);
-                        break;
+                        MethodInsnNode methodInsn = (MethodInsnNode) node;
+
+                        if (methodInsn.name.equals("getBaublesHandler")) {
+                            InsnList newInstructions = new InsnList();
+
+                            for (int i = 0; i <= 1; i++) {
+                                iterator.remove();
+                                node = iterator.next();
+                            }
+
+                            newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                            newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                            newInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                                    "baubles/core/transformers/BotaniaTransformer",
+                                    "getTrueBelt",
+                                    "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/ItemStack;)Lnet/minecraft/item/ItemStack;",
+                                    false));
+
+                            method.instructions.insertBefore(node, newInstructions);
+//                            method.instructions.remove(node);
+
+                        }
                     }
                 }
-                break;
+            } else if (method.name.equals("updatePlayerStepStatus")) {
+                Iterator<AbstractInsnNode> iterator = method.instructions.iterator();
+                while (iterator.hasNext()) {
+                    AbstractInsnNode node = iterator.next();
+                    if (node.getOpcode() == INVOKEINTERFACE) {
+                        MethodInsnNode methodInsn = (MethodInsnNode) node;
+
+                        if (methodInsn.name.equals("getBaublesHandler")) {
+                            InsnList newInstructions = new InsnList();
+
+                            for (int i = 0; i <= 1; i++) {
+                                iterator.remove();
+                                node = iterator.next();
+                            }
+
+                            newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                            newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                            newInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                                    "baubles/core/transformers/BotaniaTransformer",
+                                    "getTrueBelt",
+                                    "Lbaubles/core/transformers/BotaniaTransformer;onPlayerJump(Lnet/minecraftforge/event/entity/living/LivingEvent$LivingJumpEvent;)V",
+                                    false));
+
+                            method.instructions.insertBefore(node, newInstructions);
+//                            method.instructions.remove(node);
+
+                        }
+                    }
+                }
             }
         }
         return write(cls);
@@ -289,6 +282,183 @@ public class BotaniaTransformer extends BaseTransformer {
         }
         return write(cls);
     }
+
+    public static byte[] transformItemFlightTiara(byte[] basicClass) {
+        ClassNode cls = read(basicClass);
+        for (MethodNode method : cls.methods) {
+
+            if (method.name.equals("updatePlayerFlyStatus")) {
+
+                Iterator<AbstractInsnNode> iterator = method.instructions.iterator();
+
+                while (iterator.hasNext()) {
+                    AbstractInsnNode node = iterator.next();
+
+                    if (node.getOpcode() == Opcodes.ICONST_4) {
+
+                        InsnList newInstructions = new InsnList();
+
+                        newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 2));
+                        newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                        newInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                                "baubles/api/BaublesApi",
+                                "isBaubleEquipped",
+                                "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I",
+                                false));
+
+                        method.instructions.insertBefore(node, newInstructions);
+                        method.instructions.remove(node);
+                        break;
+                    }
+                }
+            }
+            if (method.name.equals("shouldPlayerHaveFlight")) {
+
+                Iterator<AbstractInsnNode> iterator = method.instructions.iterator();
+                while (iterator.hasNext()) {
+                    AbstractInsnNode node = iterator.next();
+
+                    if (node.getOpcode() == Opcodes.ICONST_4) {
+
+                        InsnList newInstructions = new InsnList();
+
+                        newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                        newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                        newInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                                "baubles/api/BaublesApi",
+                                "isBaubleEquipped",
+                                "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I",
+                                false));
+
+                        method.instructions.insertBefore(node, newInstructions);
+                        method.instructions.remove(node);
+
+                        break;
+                    }
+                }
+
+                break;
+            }
+        }
+        return write(cls);
+    }
+
+    public static byte[] transformHUDHandler(byte[] basicClass) {
+        ClassNode cls = read(basicClass);
+        for (MethodNode method : cls.methods) {
+
+            if (method.name.equals("onDrawScreenPre")) {
+
+                Iterator<AbstractInsnNode> iterator = method.instructions.iterator();
+
+                while (iterator.hasNext()) {
+                    AbstractInsnNode node = iterator.next();
+
+                    if (node.getOpcode() == Opcodes.ICONST_4) {
+
+                        InsnList newInstructions = new InsnList();
+                        newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                        newInstructions.add(new FieldInsnNode(Opcodes.GETFIELD,
+                                "net/minecraft/client/Minecraft",
+                                getMcPlayerStr(),
+                                "Lnet/minecraft/client/entity/EntityPlayerSP;"));
+                        newInstructions.add(new FieldInsnNode(Opcodes.GETSTATIC,
+                                "vazkii/botania/common/item/ModItems",
+                                "flightTiara",
+                                "Lnet/minecraft/item/Item;"));
+                        newInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                                "baubles/api/BaublesApi",
+                                "isBaubleEquipped",
+                                "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I",
+                                false));
+
+                        method.instructions.insertBefore(node, newInstructions);
+                        method.instructions.remove(node);
+                    } else if (node.getOpcode() == Opcodes.ICONST_1) {
+
+                        InsnList newInstructions = new InsnList();
+                        newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                        newInstructions.add(new FieldInsnNode(Opcodes.GETFIELD,
+                                "net/minecraft/client/Minecraft",
+                                getMcPlayerStr(),
+                                "Lnet/minecraft/client/entity/EntityPlayerSP;"));
+                        newInstructions.add(new FieldInsnNode(Opcodes.GETSTATIC,
+                                "vazkii/botania/common/item/ModItems",
+                                "dodgeRing",
+                                "Lnet/minecraft/item/Item;"));
+                        newInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                                "baubles/api/BaublesApi",
+                                "isBaubleEquipped",
+                                "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I",
+                                false));
+
+                        method.instructions.insertBefore(node, newInstructions);
+                        method.instructions.remove(node);
+                    } else if (node.getOpcode() == Opcodes.ICONST_2) {
+
+                        InsnList newInstructions = new InsnList();
+                        newInstructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                        newInstructions.add(new FieldInsnNode(Opcodes.GETFIELD,
+                                "net/minecraft/client/Minecraft",
+                                getMcPlayerStr(),
+                                "Lnet/minecraft/client/entity/EntityPlayerSP;"));
+                        newInstructions.add(new FieldInsnNode(Opcodes.GETSTATIC,
+                                "vazkii/botania/common/item/ModItems",
+                                "dodgeRing",
+                                "Lnet/minecraft/item/Item;"));
+                        newInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                                "baubles/api/BaublesApi",
+                                "isBaubleEquipped",
+                                "(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/item/Item;)I",
+                                false));
+
+                        method.instructions.insertBefore(node, newInstructions);
+                        method.instructions.remove(node);
+
+                    }
+                }
+            }
+        }
+        return write(cls);
+    }
+
+    private static String getMcPlayerStr() {
+//        return "player";
+        return Baubles.isDev() ? "player" : "field_71439_g";
+    }
+
+    public static ItemStack getTrueBelt(EntityPlayer player, ItemStack old) {
+        ItemStack belt = BaublesApi.getBaublesHandler(player).getStackInSlot(BaublesApi.isBaubleEquipped(player, old.getItem()));
+
+        if (belt.isEmpty()) {
+            belt = BaublesApi.getBaublesHandler(player).getStackInSlot(BaublesApi.isBaubleEquipped(player, ModItems.superTravelBelt));
+        }
+        if (belt.isEmpty()) {
+            belt = BaublesApi.getBaublesHandler(player).getStackInSlot(BaublesApi.isBaubleEquipped(player, ModItems.speedUpBelt));
+        }
+
+        return belt;
+    }
+
+    public static void onPlayerJump(LivingEvent.LivingJumpEvent event) {
+        if(event.getEntityLiving() instanceof EntityPlayer) {
+            EntityPlayer player = (EntityPlayer) event.getEntityLiving();
+//            ItemStack belt = BaublesApi.getBaublesHandler(player).getStackInSlot(3);
+            List<ItemStack> belts = Arrays.stream(BaubleType.BELT.getValidSlotsArrays(player))
+                    .mapToObj(slot -> BaublesApi.getBaublesHandler(player).getStackInSlot(slot))
+                    .collect(Collectors.toList());
+
+
+            for (ItemStack belt : belts) {
+                if (!belt.isEmpty() && belt.getItem() instanceof ItemTravelBelt && ManaItemHandler.requestManaExact(belt, player, 1, false)) {
+                    player.motionY += ((ItemTravelBelt) belt.getItem()).jump;
+                    player.fallDistance = -((ItemTravelBelt) belt.getItem()).fallBuffer;
+                    break;
+                }
+            }
+        }
+    }
+
 
 //    public static byte[] transformItemBauble(byte[] basicClass) {
 //        ClassNode cls = read(basicClass);

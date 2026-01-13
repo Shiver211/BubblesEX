@@ -82,25 +82,27 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
     }
 
     @Override
-    public void addSlot(SlotDefinition addSlotDefinition) {
+    public boolean addSlot(SlotDefinition addSlotDefinition) {
         for (int i = 0; i < slots.length; i++) {
             SlotDefinition slotDefinition = slots[i];
             if (slotDefinition == null) {
                 this.slots[i] = addSlotDefinition;
-                break;
+                return true;
             }
         }
+        return false;
     }
 
     @Override
-    public void removeSlot(SlotDefinition addSlotDefinition) {
+    public boolean removeSlot(SlotDefinition addSlotDefinition) {
         for (int i = (slots.length - 1); i > 0; i--) {
             SlotDefinition slotDefinition = slots[i];
             if (slotDefinition == addSlotDefinition) {
                 this.slots[i] = null;
-                break;
+                return true;
             }
         }
+        return false;
     }
 
     @Override
@@ -118,8 +120,13 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
         this.offset += offset;
         int slots = getRealBaubleSlots();
         this.offset %= slots;
-        if (this.offset < 0) this.offset += slots;
-        else if (this.offset >= slots) this.offset -= slots;
+        if (Config.rollMode == 1) {
+            if (this.offset < 0) this.offset += slots;
+            else if (this.offset >= slots) this.offset -= slots;
+        } else if (Config.rollMode == 2){
+            if (this.offset < 0) this.offset = 0;
+            else if (this.offset >= (slots - 7)) this.offset -= offset;
+        }
     }
 
     // TODO Find a way to use without casting.
@@ -179,6 +186,7 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
 
     @Override
     public int getSlots() {
+//        return getRealBaubleSlots();
         return this.stacks.length;
     }
 

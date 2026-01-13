@@ -125,14 +125,8 @@ public class CommandBaubles extends CommandBase {
                     String playerName = args[1];
                     String slotName = args[2];
 
-                    ResourceLocation location;
-                    if (!slotName.contains(":")) location = new ResourceLocation(Baubles.MODID, slotName);
-                    else location = new ResourceLocation(slotName);
-                    SlotDefinition definition = SlotDefinitions.get(location);
-
-                    if (!checkPlayerBaublesIsFull(entityplayermp)) {
-                        BaublesApi.getBaublesHandler(entityplayermp).addSlot(definition);
-                        PacketHandler.INSTANCE.sendTo(new PacketAddSlot(entityplayermp, slotName), entityplayermp);
+                    if (!BaublesApi.checkPlayerBaublesIsFull(entityplayermp)) {
+                        BaublesApi.addPlayerSlot(entityplayermp, slotName);
                         sender.sendMessage(new TextComponentTranslation("command.baubles.add_success"));
                     } else {
                         sender.sendMessage(new TextComponentTranslation("command.baubles.add_full"));
@@ -146,13 +140,7 @@ public class CommandBaubles extends CommandBase {
                     String playerName = args[1];
                     String slotName = args[2];
 
-                    ResourceLocation location;
-                    if (!slotName.contains(":")) location = new ResourceLocation(Baubles.MODID, slotName);
-                    else location = new ResourceLocation(slotName);
-                    SlotDefinition definition = SlotDefinitions.get(location);
-
-                    BaublesApi.getBaublesHandler(entityplayermp).removeSlot(definition);
-                    PacketHandler.INSTANCE.sendTo(new PacketRemoveSlot(entityplayermp, slotName), entityplayermp);
+                    BaublesApi.removePlayerSlot(entityplayermp, slotName);
                     sender.sendMessage(new TextComponentTranslation("command.baubles.remove_success"));
                 } else {
                     sender.sendMessage(new TextComponentTranslation("command.baubles.remove_fail"));
@@ -164,15 +152,7 @@ public class CommandBaubles extends CommandBase {
         }
     }
 
-    private boolean checkPlayerBaublesIsFull(EntityPlayerMP entityPlayerMP) {
-        IBaublesItemHandler iBaublesItemHandler = BaublesApi.getBaublesHandler(entityPlayerMP);
-        boolean isFull = true;
-        for (int i = 0; i < iBaublesItemHandler.getSlots(); i++) {
-            SlotDefinition slotDefinition = iBaublesItemHandler.getRealSlot(i);
-            if (slotDefinition == null) isFull = false;
-        }
-        return isFull;
-    }
+
 
 
 }

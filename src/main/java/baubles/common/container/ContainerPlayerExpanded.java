@@ -203,8 +203,10 @@ public class ContainerPlayerExpanded extends Container {
 
             if (itemstack1.isEmpty() && slot instanceof SlotBauble) {
                 IBauble cap = itemstack.getCapability(BaublesCapabilities.CAPABILITY_ITEM_BAUBLE, null);
-                if (cap != null)
+                if (cap != null) {
+                    System.out.println("dawdawe");
                     cap.onUnequipped(itemstack, playerIn);
+                }
             }
 
             ItemStack itemstack2 = slot.onTake(playerIn, itemstack1);

@@ -37,6 +37,7 @@ public class Config {
     // Configuration Options
     public static boolean renderBaubles = true;
     public static int slotMaxNum = 32;
+    public static int rollMode = 1;
     public static String[] newSlotType = new String[]{};
     public static String[] changeBaubleType = new String[]{};
     public static boolean rightClickEquipped = false;
@@ -66,6 +67,7 @@ public class Config {
         changeBaubleType = config.get(Configuration.CATEGORY_GENERAL, "changeBaubleType", changeBaubleType, "Use this to change the bauble type of the item.\nexample: minecraft:apple -> body -> -1\n0 = Only inventory update | 1 = Only armor update | 2 = both | -1 = nothing").getStringList();
         newSlotType = config.get(Configuration.CATEGORY_GENERAL, "newSlotType", newSlotType, "Used to add the new type of slots.\nexample: ear\nNext, you'll need to place the \"ear.png\" file into assets/baubles/textures/gui/slots/ as part of your resource pack, just like the others.\nAnd add \"baubles.type.ear=Ear\" to the language file (example: en_us.lang)").getStringList();
         slotMaxNum = config.getInt("slotMaxNum", Configuration.CATEGORY_GENERAL, slotMaxNum, 0, 99999, "Used to set the maximum number of slots");
+        rollMode = config.getInt("rollMode", Configuration.CATEGORY_GENERAL, rollMode, 1, 2, "The mode when scrolling the accessory bar [1 indicates looping (1 -> 9 -> 1), 2 indicates non-looping (1 <-> 9)]");
 //        defaultSlot = config.get("defaultSlot", Configuration.CATEGORY_GENERAL, defaultSlot, "Set this to false to disable rendering of baubles in the player.").getStringList();
         rightClickEquipped = config.getBoolean("rightClickEquipped", Configuration.CATEGORY_GENERAL, rightClickEquipped, "If false, the player cannot directly wear the ornament by right-clicking it");
         renderBaubles = config.getBoolean("baubleRender.enabled", Configuration.CATEGORY_CLIENT, renderBaubles, "Set this to false to disable rendering of baubles in the player.");
