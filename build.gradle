@@ -6,7 +6,7 @@ plugins {
     id 'maven-publish'
     id 'org.jetbrains.gradle.plugin.idea-ext' version '1.1.7'
     id 'eclipse'
-    id 'com.gtnewhorizons.retrofuturagradle' version '1.3.27'
+    id 'com.gtnewhorizons.retrofuturagradle' version '1.4.0'
     id 'com.matthewprenger.cursegradle' version '1.4.0'
 }
 
@@ -92,6 +92,9 @@ repositories {
             includeGroup 'curse.maven'
         }
     }
+    flatDir {
+        dirs 'libs'
+    }
     mavenLocal() // Must be last for caching to work
 }
 
@@ -118,7 +121,7 @@ dependencies {
     var rlartifacts = "curse.maven:RLArtifacts-819886:4475428"
     var ExU2 = "curse.maven:ExU2-225561:2678374"
     var Angel_Ring = "curse.maven:Angel Ring-256224:2518561"
-    var Tombstone = "curse.maven:Corail's Tombstone-243707:6261464"
+    //var Tombstone = "curse.maven:Corail's Tombstone-243707:6261464"
     var TrinketsAndBaubles = "curse.maven:TrinketsAndBaubles-279900:5717039"
     var Thaumcraft6 = "curse.maven:Thaumcraft6-223628:2629023"
 
@@ -182,7 +185,11 @@ dependencies {
 
     // Corail's Tombstone
     if (project.runtime_Corails_Tombstone.toBoolean()) {
-        implementation rfg.deobf(Tombstone)
+        try {
+            implementation rfg.deobf(Tombstone)
+        } catch (Exception e) {
+            implementation name: 'tombstone-1.12.2-4.7.5'
+        }
     }
 
     // Trinkets and Baubles
