@@ -255,6 +255,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
             this.drawBaubleSlotsOnTop();
             GlStateManager.popMatrix();
         }
+        this.drawCarriedItemOnTop(mouseX, mouseY);
         this.renderHoveredToolTip(mouseX, mouseY);
         this.drawHoveredBaubleSlotTypeTooltip(mouseX, mouseY);
     }
@@ -387,6 +388,24 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
         GlStateManager.translate(0, 0, 400);
         String str = I18n.format(definition.getTranslationKey(slotIndex));
         GuiUtils.drawHoveringText(Collections.singletonList(str), mouseX + 2, mouseY, width, height, 300, renderer);
+        GlStateManager.popMatrix();
+    }
+
+    private void drawCarriedItemOnTop(int mouseX, int mouseY) {
+        ItemStack carried = this.mc.player.inventory.getItemStack();
+        if (carried.isEmpty()) return;
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(0.0F, 0.0F, 500.0F);
+        GlStateManager.enableDepth();
+        RenderHelper.enableGUIStandardItemLighting();
+        this.itemRender.zLevel = 300.0F;
+        this.zLevel = 300.0F;
+        this.itemRender.renderItemAndEffectIntoGUI(this.mc.player, carried, mouseX - 8, mouseY - 8);
+        this.itemRender.renderItemOverlayIntoGUI(this.fontRenderer, carried, mouseX - 8, mouseY - 8, null);
+        this.itemRender.zLevel = 0.0F;
+        this.zLevel = 0.0F;
+        RenderHelper.disableStandardItemLighting();
         GlStateManager.popMatrix();
     }
 
