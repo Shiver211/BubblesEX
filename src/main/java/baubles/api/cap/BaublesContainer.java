@@ -169,8 +169,31 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
         if (stack == null || stack.isEmpty()) return false;
         IBauble bauble = stack.getCapability(BaublesCapabilities.CAPABILITY_ITEM_BAUBLE, null);
         if (bauble != null) {
+            if (isDuplicateBaubleBlocked(slot, stack)) return false;
             return bauble.canUnequip(stack, entity) && this.getSlot(slot).canPutItem(slot, stack);
         }
+        return false;
+    }
+
+    private boolean isDuplicateBaubleBlocked(int slot, @Nonnull ItemStack stack) {
+        if (!Config.preventDuplicateBaubles) return false;
+        ResourceLocation itemId = stack.getItem().getRegistryName();
+        if (itemId == null) return false;
+        String itemIdStr = itemId.toString();
+        if (Config.isDuplicateBaubleWhitelisted(itemIdStr)) return false;
+
+        int targetSlot = validateSlotIndex(slot);
+        if (targetSlot == -1) return false;
+        int targetRealSlot = getSlotIndex(targetSlot);
+
+        for (int i = 0; i < this.slots.length; i++) {
+            if (this.slots[i] == null || i == targetRealSlot) continue;
+            ItemStack existing = getStackNA(i);
+            if (existing.isEmpty()) continue;
+            ResourceLocation existingId = existing.getItem().getRegistryName();
+            if (existingId != null && itemId.equals(existingId)) return true;
+        }
+
         return false;
     }
 
