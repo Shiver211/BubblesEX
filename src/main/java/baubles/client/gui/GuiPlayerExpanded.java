@@ -387,7 +387,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
         GlStateManager.pushMatrix();
         GlStateManager.translate(0, 0, 400);
         String str = I18n.format(definition.getTranslationKey(slotIndex));
-        GuiUtils.drawHoveringText(Collections.singletonList(str), mouseX + 2, mouseY, width, height, 300, renderer);
+        GuiUtils.drawHoveringText(Collections.singletonList(str), mouseX, mouseY, width, height, 300, renderer);
         GlStateManager.popMatrix();
     }
 

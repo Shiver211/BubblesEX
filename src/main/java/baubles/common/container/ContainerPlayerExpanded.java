@@ -248,8 +248,6 @@ public class ContainerPlayerExpanded extends Container {
                     itemstack.setCount(maxSize);
                     flag = true;
                 }
-
-                container.changeOffsetBasedOnSlot(slotIndex);
             }
 
             else if (itemstack.isEmpty() && slot.canPutItem(slotIndex, stack)) {
@@ -259,8 +257,6 @@ public class ContainerPlayerExpanded extends Container {
                 else {
                     container.setStackInSlot(slotIndex, stack.splitStack(stack.getCount()));
                 }
-
-                container.changeOffsetBasedOnSlot(slotIndex);
                 flag = true;
             }
         }
