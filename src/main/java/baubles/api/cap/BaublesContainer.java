@@ -98,6 +98,7 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
         for (int i = (slots.length - 1); i > 0; i--) {
             SlotDefinition slotDefinition = slots[i];
             if (slotDefinition == addSlotDefinition) {
+                this.dropAndClearRemovedSlotStack(i);
                 this.slots[i] = null;
                 return true;
             }
@@ -107,7 +108,32 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
 
     @Override
     public void setSlot(int slot, SlotDefinition setSlotDefinition) {
+        if (slot >= 0 && slot < this.slots.length && this.slots[slot] != null && setSlotDefinition == null) {
+            this.dropAndClearRemovedSlotStack(slot);
+        }
         this.slots[slot] = setSlotDefinition;
+    }
+
+    private void dropAndClearRemovedSlotStack(int realSlotIndex) {
+        if (realSlotIndex < 0 || realSlotIndex >= this.stacks.length) return;
+
+        ItemStack removedStack = this.getStackNA(realSlotIndex);
+        if (removedStack.isEmpty()) return;
+
+        ItemStack stackToDrop = removedStack.copy();
+        this.stacks[realSlotIndex] = ItemStack.EMPTY;
+
+        if (this.player instanceof EntityPlayer && removedStack.hasCapability(BaublesCapabilities.CAPABILITY_ITEM_BAUBLE, null)) {
+            IBauble bauble = removedStack.getCapability(BaublesCapabilities.CAPABILITY_ITEM_BAUBLE, null);
+            if (bauble != null) {
+                bauble.onUnequipped(removedStack, (EntityPlayer) this.player);
+            }
+        }
+
+        if (this.player != null && this.player.world != null && !this.player.world.isRemote) {
+            EntityItem eItem = new EntityItem(this.player.world, this.player.posX, this.player.posY, this.player.posZ, stackToDrop);
+            this.player.world.spawnEntity(eItem);
+        }
     }
 
     // TODO Find a way to use without casting.
