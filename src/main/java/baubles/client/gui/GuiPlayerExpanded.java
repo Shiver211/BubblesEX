@@ -58,8 +58,9 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
     private static final int BAUBLE_INTERIOR_WIDTH = 18;
     private static final int BAUBLE_RIGHT_BORDER_WIDTH = 6;
     private static final int MAX_VISIBLE_BAUBLE_COLUMNS = 4;
-    private static final int PAGE_BUTTON_SIZE = 9;
-    private static final int PAGE_BUTTON_GAP = 2;
+    private static final int PAGE_BUTTON_W = 4;
+    private static final int PAGE_BUTTON_H = 7;
+    private static final int PAGE_BUTTON_GAP = 4;
     private static final int PAGE_BUTTON_TOP_GAP = 1;
 
     private static final boolean ENABLE_RECIPE_BOOK = !ModCompatibility.RecipeBook$isDisabled();
@@ -85,6 +86,33 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
         } catch (NoSuchFieldException | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    // Pixel fill maps for arrow icons (4x7 grid, [px][py])
+    private static final boolean[][] LEFT_ARROW  = new boolean[4][7];
+    private static final boolean[][] RIGHT_ARROW = new boolean[4][7];
+
+    static {
+        // Left-pointing ◄: tip at px=0, row py=3
+        for (int[] p : new int[][]{
+                {3,0},
+                {2,1},{3,1},
+                {1,2},{2,2},{3,2},
+                {0,3},{1,3},{2,3},{3,3},
+                {1,4},{2,4},{3,4},
+                {2,5},{3,5},
+                {3,6}})
+            LEFT_ARROW[p[0]][p[1]] = true;
+        // Right-pointing ►: tip at px=3, row py=3
+        for (int[] p : new int[][]{
+                {0,0},
+                {0,1},{1,1},
+                {0,2},{1,2},{2,2},
+                {0,3},{1,3},{2,3},{3,3},
+                {0,4},{1,4},{2,4},
+                {0,5},{1,5},
+                {0,6}})
+            RIGHT_ARROW[p[0]][p[1]] = true;
     }
 
     private final EntityPlayer player;
@@ -420,7 +448,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
         int leftButtonX = this.getPageLeftButtonX();
         int rightButtonX = this.getPageRightButtonX();
 
-        if (mouseX >= leftButtonX && mouseX < leftButtonX + PAGE_BUTTON_SIZE && mouseY >= buttonsY && mouseY < buttonsY + PAGE_BUTTON_SIZE) {
+        if (mouseX >= leftButtonX && mouseX < leftButtonX + PAGE_BUTTON_W && mouseY >= buttonsY && mouseY < buttonsY + PAGE_BUTTON_H) {
             if (this.baublePage > 0) {
                 this.baublePage--;
                 this.updateBaubleSlotPositions();
@@ -428,7 +456,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
             return;
         }
 
-        if (mouseX >= rightButtonX && mouseX < rightButtonX + PAGE_BUTTON_SIZE && mouseY >= buttonsY && mouseY < buttonsY + PAGE_BUTTON_SIZE) {
+        if (mouseX >= rightButtonX && mouseX < rightButtonX + PAGE_BUTTON_W && mouseY >= buttonsY && mouseY < buttonsY + PAGE_BUTTON_H) {
             if (this.baublePage < pages - 1) {
                 this.baublePage++;
                 this.updateBaubleSlotPositions();
@@ -493,7 +521,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
 
     private int getPageButtonsStartX() {
         int rightmostColumnX = this.guiLeft - 28;
-        int totalWidth = PAGE_BUTTON_SIZE * 2 + PAGE_BUTTON_GAP;
+        int totalWidth = PAGE_BUTTON_W * 2 + PAGE_BUTTON_GAP;
         return rightmostColumnX + (28 - totalWidth) / 2;
     }
 
@@ -502,7 +530,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
     }
 
     private int getPageRightButtonX() {
-        return this.getPageButtonsStartX() + PAGE_BUTTON_SIZE + PAGE_BUTTON_GAP;
+        return this.getPageButtonsStartX() + PAGE_BUTTON_W + PAGE_BUTTON_GAP;
     }
 
     private int getPageButtonsY() {
@@ -521,52 +549,56 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
 
         boolean canPrev = this.baublePage > 0;
         boolean canNext = this.baublePage < pages - 1;
-        boolean hoverPrev = canPrev && this.isMouseWithin(mouseX, mouseY, leftX, y, PAGE_BUTTON_SIZE, PAGE_BUTTON_SIZE);
-        boolean hoverNext = canNext && this.isMouseWithin(mouseX, mouseY, rightX, y, PAGE_BUTTON_SIZE, PAGE_BUTTON_SIZE);
+        boolean hoverPrev = canPrev && this.isMouseWithin(mouseX, mouseY, leftX, y, PAGE_BUTTON_W, PAGE_BUTTON_H);
+        boolean hoverNext = canNext && this.isMouseWithin(mouseX, mouseY, rightX, y, PAGE_BUTTON_W, PAGE_BUTTON_H);
 
-        int activeFill = 0xFF9B9B9B;
-        int hoverFill = 0xFFA7A7A7;
-        int disabledFill = 0xFF7C7C7C;
-        int borderOuter = 0xFF111111;
-        int borderInner = 0xFF2B2B2B;
-        int highlightColor = 0xFFC8C8C8;
-        int shadowColor = 0xFF5D5D5D;
-        int iconColor = 0xFFF4F4F4;
-        int iconShadowColor = 0xFF1C1C1C;
-        int disabledIconColor = 0xFFC0C0C0;
-        int disabledIconShadowColor = 0xFF555555;
+        int iconColor         = 0xFFC6C6C6;
+        int hoverIconColor    = 0xFF7D87BE;
+        int disabledIconColor = 0xFF444444;
 
-        this.drawLeftArrowIcon(leftX, y, canPrev ? iconColor : disabledIconColor);
-        this.drawRightArrowIcon(rightX, y, canNext ? iconColor : disabledIconColor);
+        int prevColor = !canPrev ? disabledIconColor : (hoverPrev ? hoverIconColor : iconColor);
+        int nextColor = !canNext ? disabledIconColor : (hoverNext ? hoverIconColor : iconColor);
+
+        this.drawLeftArrowIcon(leftX, y, prevColor);
+        this.drawRightArrowIcon(rightX, y, nextColor);
     }
 
 
     private void drawLeftArrowIcon(int x, int y, int color) {
-        // sharp right-pointing triangle (widths 1,2,3,4,5,4,3,2,1), tip at x+7, shifted up 1px
-        int yy = y - 1;
-        this.drawRect(x + 7, yy + 0, x + 8, yy + 1, color); // 1
-        this.drawRect(x + 6, yy + 1, x + 8, yy + 2, color); // 2
-        this.drawRect(x + 5, yy + 2, x + 8, yy + 3, color); // 3
-        this.drawRect(x + 4, yy + 3, x + 8, yy + 4, color); // 4
-        this.drawRect(x + 3, yy + 4, x + 8, yy + 5, color); // 5
-        this.drawRect(x + 4, yy + 5, x + 8, yy + 6, color); // 4
-        this.drawRect(x + 5, yy + 6, x + 8, yy + 7, color); // 3
-        this.drawRect(x + 6, yy + 7, x + 8, yy + 8, color); // 2
-        this.drawRect(x + 7, yy + 8, x + 8, yy + 9, color); // 1
+        this.drawArrowIcon(x, y, LEFT_ARROW, color);
     }
 
     private void drawRightArrowIcon(int x, int y, int color) {
-        // sharp left-pointing triangle (widths 1,2,3,4,5,4,3,2,1), tip at x+1, shifted up 1px
-        int yy = y - 1;
-        this.drawRect(x + 1, yy + 0, x + 2, yy + 1, color); // 1
-        this.drawRect(x + 1, yy + 1, x + 3, yy + 2, color); // 2
-        this.drawRect(x + 1, yy + 2, x + 4, yy + 3, color); // 3
-        this.drawRect(x + 1, yy + 3, x + 5, yy + 4, color); // 4
-        this.drawRect(x + 1, yy + 4, x + 6, yy + 5, color); // 5
-        this.drawRect(x + 1, yy + 5, x + 5, yy + 6, color); // 4
-        this.drawRect(x + 1, yy + 6, x + 4, yy + 7, color); // 3
-        this.drawRect(x + 1, yy + 7, x + 3, yy + 8, color); // 2
-        this.drawRect(x + 1, yy + 8, x + 2, yy + 9, color); // 1
+        this.drawArrowIcon(x, y, RIGHT_ARROW, color);
+    }
+
+    /** Draws an arrow icon with a 1px black pixel-perfect outline. */
+    private void drawArrowIcon(int x, int y, boolean[][] fill, int color) {
+        int w = fill.length;
+        int h = fill[0].length;
+        int outline = 0xFF111111;
+        int[][] dirs = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        // Outline: for each fill pixel, paint neighbors that are NOT fill pixels
+        for (int px = 0; px < w; px++) {
+            for (int py = 0; py < h; py++) {
+                if (!fill[px][py]) continue;
+                for (int[] d : dirs) {
+                    int nx = px + d[0], ny = py + d[1];
+                    boolean neighborIsFill = nx >= 0 && nx < w && ny >= 0 && ny < h && fill[nx][ny];
+                    if (!neighborIsFill) {
+                        this.drawRect(x + nx, y + ny, x + nx + 1, y + ny + 1, outline);
+                    }
+                }
+            }
+        }
+        // Solid fill
+        for (int px = 0; px < w; px++) {
+            for (int py = 0; py < h; py++) {
+                if (fill[px][py]) {
+                    this.drawRect(x + px, y + py, x + px + 1, y + py + 1, color);
+                }
+            }
+        }
     }
 
 
