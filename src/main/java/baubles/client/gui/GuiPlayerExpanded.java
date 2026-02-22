@@ -348,15 +348,16 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
             if (!(slot instanceof SlotBauble)) continue;
             if (slot.xPos < -999 || slot.yPos < -999) continue;
 
+            ItemStack stack = slot.getStack();
+
             TextureAtlasSprite sprite = slot.getBackgroundSprite();
-            if (sprite != null) {
+            if (stack.isEmpty() && sprite != null) {
                 GlStateManager.disableLighting();
                 this.mc.getTextureManager().bindTexture(slot.getBackgroundLocation());
                 this.drawTexturedModalRect(slot.xPos, slot.yPos, sprite, 16, 16);
                 GlStateManager.enableLighting();
             }
 
-            ItemStack stack = slot.getStack();
             if (!stack.isEmpty()) {
                 GlStateManager.enableDepth();
                 this.itemRender.renderItemAndEffectIntoGUI(this.mc.player, stack, slot.xPos, slot.yPos);
