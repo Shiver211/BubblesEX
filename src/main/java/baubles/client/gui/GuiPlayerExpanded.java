@@ -24,6 +24,8 @@ import net.minecraft.client.gui.achievement.GuiStats;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.InventoryEffectRenderer;
+import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Slot;
@@ -231,30 +233,6 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
     @Override
     protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
         this.fontRenderer.drawString(I18n.format("container.crafting"), 97, 8, 4210752);
-        int slotIndex = this.getHoveredBaubleSlotIndex(mouseX, mouseY);
-        if (slotIndex >= 0) {
-            BaublesContainer container = ((BaublesContainer) baublesHandler);
-
-            ItemStack stack = container.getStackInSlot(slotIndex);
-            if (!stack.isEmpty()) return;
-
-            SlotDefinition definition = container.getSlot(slotIndex);
-
-            if (definition != null) {
-
-                FontRenderer renderer = Minecraft.getMinecraft().fontRenderer;
-                GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-                GlStateManager.enableBlend();
-                GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
-                GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-
-                GlStateManager.pushMatrix();
-                GlStateManager.translate(0, 0, 200);
-                String str = I18n.format(definition.getTranslationKey(slotIndex));
-                GuiUtils.drawHoveringText(Collections.singletonList(str), mouseX - this.guiLeft, mouseY - this.guiTop, width, height, 300, renderer);
-                GlStateManager.popMatrix();
-            }
-        }
     }
 
     @Override
@@ -266,7 +244,19 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
         this.oldMouseX = (float) mouseX;
         this.oldMouseY = (float) mouseY;
         super.drawScreen(mouseX, mouseY, partialTicks);
+        if (this.getRealBaubleSlots() > 0) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(0.0F, 0.0F, 300.0F);
+            this.drawBaubleBackgroundAndPageButtons();
+            GlStateManager.popMatrix();
+
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(0.0F, 0.0F, 301.0F);
+            this.drawBaubleSlotsOnTop();
+            GlStateManager.popMatrix();
+        }
         this.renderHoveredToolTip(mouseX, mouseY);
+        this.drawHoveredBaubleSlotTypeTooltip(mouseX, mouseY);
     }
 
     @Override
@@ -284,54 +274,120 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
 
         this.drawTexturedModalRect(k, l, 0, 0, this.xSize, this.ySize);
 
+        GuiInventory.drawEntityOnScreen(k + 51, l + 75, 30, (float) (k + 51) - this.oldMouseX, (float) (l + 75 - 50) - this.oldMouseY, this.mc.player);
+    }
+
+    private void drawBaubleBackgroundAndPageButtons() {
+        RenderHelper.disableStandardItemLighting();
+        GlStateManager.disableLighting();
+        GlStateManager.disableDepth();
+        GlStateManager.enableBlend();
+        GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
+        GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        this.mc.getTextureManager().bindTexture(background);
+
+        int k = this.guiLeft;
+        int l = this.guiTop;
         int maxSlots = this.getRealBaubleSlots();
+        if (maxSlots <= 0) return;
 
-        if (maxSlots > 0) {
-            int maxRowsPerColumn = this.getActualMaxBaubleSlots();
-            int columns = (maxSlots + maxRowsPerColumn - 1) / maxRowsPerColumn;
-            int[] columnRows = new int[columns];
-            int startColumn = this.getVisibleBaubleStartColumn();
-            int endColumn = this.getVisibleBaubleEndColumnExclusive();
+        int maxRowsPerColumn = this.getActualMaxBaubleSlots();
+        int columns = (maxSlots + maxRowsPerColumn - 1) / maxRowsPerColumn;
+        int[] columnRows = new int[columns];
+        int startColumn = this.getVisibleBaubleStartColumn();
+        int endColumn = this.getVisibleBaubleEndColumnExclusive();
 
-            for (int column = 0; column < columns; column++) {
-                columnRows[column] = Math.min(maxRowsPerColumn, maxSlots - (column * maxRowsPerColumn));
-            }
-
-            for (int column = startColumn; column < endColumn; column++) {
-                int visibleColumn = column - startColumn;
-                int x = k - 28 - (visibleColumn * BAUBLE_COLUMN_STEP);
-                int rows = columnRows[column];
-
-                if (rows == 1) {
-                    boolean leftNeighborHasRow = column + 1 < columns && 0 < columnRows[column + 1];
-                    boolean rightNeighborHasRow = column - 1 >= 0 && 0 < columnRows[column - 1];
-                    this.drawBaubleColumnPart(x, l, 34, 28, !leftNeighborHasRow, !rightNeighborHasRow);
-                    continue;
-                }
-
-                for (int i = 0; i < rows; i++) {
-                    int textureY = 39;
-                    int height = 20;
-                    int y = l + (i * 18);
-
-                    if (i == 0) {
-                        textureY = 34;
-                        height += 4;
-                    }
-                    else y += 5;
-                    if (i == rows - 1) height += 4;
-
-                    boolean leftNeighborHasRow = column + 1 < endColumn && i < columnRows[column + 1];
-                    boolean rightNeighborHasRow = column - 1 >= startColumn && i < columnRows[column - 1];
-
-                    this.drawBaubleColumnPart(x, y, textureY, height, !leftNeighborHasRow, !rightNeighborHasRow);
-                }
-            }
-
-            this.drawBaublePageButtons();
+        for (int column = 0; column < columns; column++) {
+            columnRows[column] = Math.min(maxRowsPerColumn, maxSlots - (column * maxRowsPerColumn));
         }
 
-        GuiInventory.drawEntityOnScreen(k + 51, l + 75, 30, (float) (k + 51) - this.oldMouseX, (float) (l + 75 - 50) - this.oldMouseY, this.mc.player);
+        for (int column = startColumn; column < endColumn; column++) {
+            int visibleColumn = column - startColumn;
+            int x = k - 28 - (visibleColumn * BAUBLE_COLUMN_STEP);
+            int rows = columnRows[column];
+
+            if (rows == 1) {
+                boolean leftNeighborHasRow = column + 1 < columns && 0 < columnRows[column + 1];
+                boolean rightNeighborHasRow = column - 1 >= 0 && 0 < columnRows[column - 1];
+                this.drawBaubleColumnPart(x, l, 34, 28, !leftNeighborHasRow, !rightNeighborHasRow);
+                continue;
+            }
+
+            for (int i = 0; i < rows; i++) {
+                int textureY = 39;
+                int height = 20;
+                int y = l + (i * 18);
+
+                if (i == 0) {
+                    textureY = 34;
+                    height += 4;
+                }
+                else y += 5;
+                if (i == rows - 1) height += 4;
+
+                boolean leftNeighborHasRow = column + 1 < endColumn && i < columnRows[column + 1];
+                boolean rightNeighborHasRow = column - 1 >= startColumn && i < columnRows[column - 1];
+
+                this.drawBaubleColumnPart(x, y, textureY, height, !leftNeighborHasRow, !rightNeighborHasRow);
+            }
+        }
+
+        this.drawBaublePageButtons();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.enableDepth();
+        GlStateManager.disableBlend();
+    }
+
+    private void drawBaubleSlotsOnTop() {
+        GlStateManager.pushMatrix();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.translate((float) this.guiLeft, (float) this.guiTop, 0.0F);
+        for (Slot slot : this.inventorySlots.inventorySlots) {
+            if (!(slot instanceof SlotBauble)) continue;
+            if (slot.xPos < -999 || slot.yPos < -999) continue;
+
+            TextureAtlasSprite sprite = slot.getBackgroundSprite();
+            if (sprite != null) {
+                GlStateManager.disableLighting();
+                this.mc.getTextureManager().bindTexture(slot.getBackgroundLocation());
+                this.drawTexturedModalRect(slot.xPos, slot.yPos, sprite, 16, 16);
+                GlStateManager.enableLighting();
+            }
+
+            ItemStack stack = slot.getStack();
+            if (!stack.isEmpty()) {
+                GlStateManager.enableDepth();
+                this.itemRender.renderItemAndEffectIntoGUI(this.mc.player, stack, slot.xPos, slot.yPos);
+                this.itemRender.renderItemOverlayIntoGUI(this.fontRenderer, stack, slot.xPos, slot.yPos, null);
+            }
+        }
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.popMatrix();
+    }
+
+    private void drawHoveredBaubleSlotTypeTooltip(int mouseX, int mouseY) {
+        int slotIndex = this.getHoveredBaubleSlotIndex(mouseX, mouseY);
+        if (slotIndex < 0) return;
+
+        BaublesContainer container = ((BaublesContainer) baublesHandler);
+        ItemStack stack = container.getStackInSlot(slotIndex);
+        if (!stack.isEmpty()) return;
+
+        SlotDefinition definition = container.getSlot(slotIndex);
+        if (definition == null) return;
+
+        FontRenderer renderer = Minecraft.getMinecraft().fontRenderer;
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.enableBlend();
+        GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
+        GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(0, 0, 400);
+        String str = I18n.format(definition.getTranslationKey(slotIndex));
+        GuiUtils.drawHoveringText(Collections.singletonList(str), mouseX + 2, mouseY, width, height, 300, renderer);
+        GlStateManager.popMatrix();
     }
 
     @Override
@@ -561,6 +617,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
 
         this.drawLeftArrowIcon(leftX, y, prevColor);
         this.drawRightArrowIcon(rightX, y, nextColor);
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
 
