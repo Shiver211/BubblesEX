@@ -90,7 +90,38 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
     }
 
     private void resetGuiLeft() {
-        this.guiLeft = (this.width - this.xSize) / 2;
+        int centeredGuiLeft = (this.width - this.xSize) / 2;
+        int columns = this.getBaubleColumnCount();
+        int leftMostBaublePanelX = centeredGuiLeft - (columns * 28);
+        int minLeftPadding = 4;
+        int shiftRight = Math.max(0, minLeftPadding - leftMostBaublePanelX);
+
+        this.guiLeft = centeredGuiLeft + shiftRight;
+        this.updateExtraButtonPositions();
+    }
+
+    private int getBaubleColumnCount() {
+        int maxSlots = this.getRealBaubleSlots();
+        if (maxSlots <= 0) return 0;
+        int maxRowsPerColumn = this.getActualMaxBaubleSlots();
+        return (maxSlots + maxRowsPerColumn - 1) / maxRowsPerColumn;
+    }
+
+    private void updateExtraButtonPositions() {
+        if (this.recipeBook != null) {
+            this.recipeBook.x = this.guiLeft + 104;
+            this.recipeBook.y = this.height / 2 - 22;
+        }
+
+        if (this.cosButton != null) {
+            this.cosButton.x = this.guiLeft + ModConfigs.CosArmorGuiButton_Left;
+            this.cosButton.y = this.guiTop + ModConfigs.CosArmorGuiButton_Top;
+        }
+
+        if (this.cosToggleButton != null) {
+            this.cosToggleButton.x = this.guiLeft + ModConfigs.CosArmorToggleButton_Left;
+            this.cosToggleButton.y = this.guiTop + ModConfigs.CosArmorToggleButton_Top;
+        }
     }
 
     @Override
@@ -184,6 +215,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        resetGuiLeft();
         this.drawDefaultBackground();
         this.oldMouseX = (float) mouseX;
         this.oldMouseY = (float) mouseY;
