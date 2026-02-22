@@ -51,6 +51,10 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
 
     public static final ResourceLocation background =
             new ResourceLocation(Baubles.MODID, "textures/gui/baubles_inventory.png");
+    private static final int BAUBLE_COLUMN_STEP = 18;
+        private static final int BAUBLE_LEFT_BORDER_WIDTH = 4;
+        private static final int BAUBLE_INTERIOR_WIDTH = 18;
+        private static final int BAUBLE_RIGHT_BORDER_WIDTH = 6;
 
     private static final boolean ENABLE_RECIPE_BOOK = !ModCompatibility.RecipeBook$isDisabled();
     private static final Field REF_OLD_MOUSE_X, REF_OLD_MOUSE_Y; // in GuiInventory to retain mouse positions when you close baubles gui
@@ -92,7 +96,8 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
     private void resetGuiLeft() {
         int centeredGuiLeft = (this.width - this.xSize) / 2;
         int columns = this.getBaubleColumnCount();
-        int leftMostBaublePanelX = centeredGuiLeft - (columns * 28);
+        int leftWidth = columns > 0 ? 28 + ((columns - 1) * BAUBLE_COLUMN_STEP) : 0;
+        int leftMostBaublePanelX = centeredGuiLeft - leftWidth;
         int minLeftPadding = 4;
         int shiftRight = Math.max(0, minLeftPadding - leftMostBaublePanelX);
 
@@ -245,11 +250,13 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
             int columns = (maxSlots + maxRowsPerColumn - 1) / maxRowsPerColumn;
 
             for (int column = 0; column < columns; column++) {
-                int x = k - 28 - (column * 28);
+                int x = k - 28 - (column * BAUBLE_COLUMN_STEP);
                 int rows = Math.min(maxRowsPerColumn, maxSlots - (column * maxRowsPerColumn));
+                boolean drawRightBorder = column == 0;
+                boolean drawLeftBorder = column == columns - 1;
 
                 if (rows == 1) {
-                    this.drawTexturedModalRect(x, l, 176, 34, 28, 28);
+                    this.drawBaubleColumnPart(x, l, 34, 28, drawLeftBorder, drawRightBorder);
                     continue;
                 }
 
@@ -265,7 +272,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
                     else y += 5;
                     if (i == rows - 1) height += 4;
 
-                    this.drawTexturedModalRect(x, y, 176, textureY, 28, height);
+                    this.drawBaubleColumnPart(x, y, textureY, height, drawLeftBorder, drawRightBorder);
                 }
             }
         }
@@ -358,7 +365,7 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
             int column = slotIndex / maxRowsPerColumn;
             int row = slotIndex % maxRowsPerColumn;
 
-            int xLoc = this.guiLeft - 24 - (column * 28);
+            int xLoc = this.guiLeft - 24 - (column * BAUBLE_COLUMN_STEP);
             int yLoc = this.guiTop + 5 + (row * 18);
 
             if (mouseX > xLoc && mouseX < xLoc + 19 && mouseY >= yLoc && mouseY < yLoc + 18) {
@@ -367,6 +374,18 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
         }
 
         return -1;
+    }
+
+    private void drawBaubleColumnPart(int x, int y, int textureY, int height, boolean drawLeftBorder, boolean drawRightBorder) {
+        this.drawTexturedModalRect(x + BAUBLE_LEFT_BORDER_WIDTH, y, 180, textureY, BAUBLE_INTERIOR_WIDTH, height);
+
+        if (drawLeftBorder) {
+            this.drawTexturedModalRect(x, y, 176, textureY, BAUBLE_LEFT_BORDER_WIDTH, height);
+        }
+
+        if (drawRightBorder) {
+            this.drawTexturedModalRect(x + BAUBLE_LEFT_BORDER_WIDTH + BAUBLE_INTERIOR_WIDTH, y, 198, textureY, BAUBLE_RIGHT_BORDER_WIDTH, height);
+        }
     }
 
     public int getBaubleSlots() {

@@ -67,7 +67,7 @@ public class ContainerPlayerExpanded extends Container {
         for (int i = 0; i < baubleSlotCount; i++) {
             int column = i / this.getActualMaxBaubleSlots();
             int row = i % this.getActualMaxBaubleSlots();
-            this.addSlotToContainer(new SlotBauble(player, baubles, i, -22 - (column * 28), 6 + (row * 18)));
+            this.addSlotToContainer(new SlotBauble(player, baubles, i, -22 - (column * 18), 6 + (row * 18)));
         }
 
         for (int i = 0; i < 3; ++i) {
