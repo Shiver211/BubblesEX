@@ -235,8 +235,7 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
 
     @Override
     public int getSlots() {
-//        return getRealBaubleSlots();
-        return this.stacks.length;
+        return getRealBaubleSlots();
     }
 
     @Nonnull
