@@ -248,15 +248,20 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
         if (maxSlots > 0) {
             int maxRowsPerColumn = this.getActualMaxBaubleSlots();
             int columns = (maxSlots + maxRowsPerColumn - 1) / maxRowsPerColumn;
+            int[] columnRows = new int[columns];
+
+            for (int column = 0; column < columns; column++) {
+                columnRows[column] = Math.min(maxRowsPerColumn, maxSlots - (column * maxRowsPerColumn));
+            }
 
             for (int column = 0; column < columns; column++) {
                 int x = k - 28 - (column * BAUBLE_COLUMN_STEP);
-                int rows = Math.min(maxRowsPerColumn, maxSlots - (column * maxRowsPerColumn));
-                boolean drawRightBorder = column == 0;
-                boolean drawLeftBorder = column == columns - 1;
+                int rows = columnRows[column];
 
                 if (rows == 1) {
-                    this.drawBaubleColumnPart(x, l, 34, 28, drawLeftBorder, drawRightBorder);
+                    boolean leftNeighborHasRow = column + 1 < columns && 0 < columnRows[column + 1];
+                    boolean rightNeighborHasRow = column - 1 >= 0 && 0 < columnRows[column - 1];
+                    this.drawBaubleColumnPart(x, l, 34, 28, !leftNeighborHasRow, !rightNeighborHasRow);
                     continue;
                 }
 
@@ -272,7 +277,10 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
                     else y += 5;
                     if (i == rows - 1) height += 4;
 
-                    this.drawBaubleColumnPart(x, y, textureY, height, drawLeftBorder, drawRightBorder);
+                    boolean leftNeighborHasRow = column + 1 < columns && i < columnRows[column + 1];
+                    boolean rightNeighborHasRow = column - 1 >= 0 && i < columnRows[column - 1];
+
+                    this.drawBaubleColumnPart(x, y, textureY, height, !leftNeighborHasRow, !rightNeighborHasRow);
                 }
             }
         }
