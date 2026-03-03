@@ -15,6 +15,9 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 import java.io.*;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 public class Config {
 
@@ -41,6 +44,9 @@ public class Config {
     public static String[] newSlotType = new String[]{};
     public static String[] changeBaubleType = new String[]{};
     public static boolean rightClickEquipped = false;
+    public static boolean preventDuplicateBaubles = false;
+    public static String[] duplicateBaublesWhitelist = new String[]{};
+    private static Set<String> duplicateBaublesWhitelistSet = new HashSet<>();
 
     public static void initialize(File configFile) {
         initConfig(configFile);
@@ -68,10 +74,22 @@ public class Config {
         newSlotType = config.get(Configuration.CATEGORY_GENERAL, "newSlotType", newSlotType, "Used to add the new type of slots.\nexample: ear\nNext, you'll need to place the \"ear.png\" file into assets/baubles/textures/gui/slots/ as part of your resource pack, just like the others.\nAnd add \"baubles.type.ear=Ear\" to the language file (example: en_us.lang)").getStringList();
         slotMaxNum = config.getInt("slotMaxNum", Configuration.CATEGORY_GENERAL, slotMaxNum, 0, 99999, "Used to set the maximum number of slots");
         rollMode = config.getInt("rollMode", Configuration.CATEGORY_GENERAL, rollMode, 1, 2, "The mode when scrolling the accessory bar [1 indicates looping (1 -> 9 -> 1), 2 indicates non-looping (1 <-> 9)]");
-//        defaultSlot = config.get("defaultSlot", Configuration.CATEGORY_GENERAL, defaultSlot, "Set this to false to disable rendering of baubles in the player.").getStringList();
         rightClickEquipped = config.getBoolean("rightClickEquipped", Configuration.CATEGORY_GENERAL, rightClickEquipped, "If false, the player cannot directly wear the ornament by right-clicking it");
+        preventDuplicateBaubles = config.getBoolean("preventDuplicateBaubles", Configuration.CATEGORY_GENERAL, preventDuplicateBaubles, "If true, the same bauble item ID cannot be equipped in multiple bauble slots (ignores NBT).");
+        duplicateBaublesWhitelist = config.get(Configuration.CATEGORY_GENERAL, "duplicateBaublesWhitelist", duplicateBaublesWhitelist, "Item ID whitelist for duplicate baubles. Items in this list can be equipped multiple times even when preventDuplicateBaubles is enabled. Example: minecraft:golden_apple").getStringList();
         renderBaubles = config.getBoolean("baubleRender.enabled", Configuration.CATEGORY_CLIENT, renderBaubles, "Set this to false to disable rendering of baubles in the player.");
+        duplicateBaublesWhitelistSet = new HashSet<>();
+        for (String entry : duplicateBaublesWhitelist) {
+            if (entry == null) continue;
+            String normalized = entry.trim().toLowerCase(Locale.ROOT);
+            if (!normalized.isEmpty()) duplicateBaublesWhitelistSet.add(normalized);
+        }
         if (config.hasChanged()) config.save();
+    }
+
+    public static boolean isDuplicateBaubleWhitelisted(String itemId) {
+        if (itemId == null) return false;
+        return duplicateBaublesWhitelistSet.contains(itemId.trim().toLowerCase(Locale.ROOT));
     }
 
     public static void save() {

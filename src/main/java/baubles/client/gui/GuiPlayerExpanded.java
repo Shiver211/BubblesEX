@@ -7,9 +7,8 @@ import baubles.api.inv.SlotDefinition;
 import baubles.client.ClientProxy;
 import baubles.common.Baubles;
 import baubles.common.container.ContainerPlayerExpanded;
+import baubles.common.container.SlotBauble;
 import baubles.common.integration.ModCompatibility;
-import baubles.common.network.PacketChangeOffset;
-import baubles.common.network.PacketHandler;
 import com.google.common.collect.Ordering;
 import lain.mods.cos.CosmeticArmorReworked;
 import lain.mods.cos.ModConfigs;
@@ -25,8 +24,11 @@ import net.minecraft.client.gui.achievement.GuiStats;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.InventoryEffectRenderer;
+import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.Potion;
 import net.minecraft.potion.PotionEffect;
@@ -53,6 +55,15 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
 
     public static final ResourceLocation background =
             new ResourceLocation(Baubles.MODID, "textures/gui/baubles_inventory.png");
+    private static final int BAUBLE_COLUMN_STEP = 18;
+    private static final int BAUBLE_LEFT_BORDER_WIDTH = 4;
+    private static final int BAUBLE_INTERIOR_WIDTH = 18;
+    private static final int BAUBLE_RIGHT_BORDER_WIDTH = 6;
+    private static final int MAX_VISIBLE_BAUBLE_COLUMNS = 4;
+    private static final int PAGE_BUTTON_W = 4;
+    private static final int PAGE_BUTTON_H = 7;
+    private static final int PAGE_BUTTON_GAP = 4;
+    private static final int PAGE_BUTTON_TOP_GAP = 1;
 
     private static final boolean ENABLE_RECIPE_BOOK = !ModCompatibility.RecipeBook$isDisabled();
     private static final Field REF_OLD_MOUSE_X, REF_OLD_MOUSE_Y; // in GuiInventory to retain mouse positions when you close baubles gui
@@ -79,12 +90,39 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
         }
     }
 
+    // Pixel fill maps for arrow icons (4x7 grid, [px][py])
+    private static final boolean[][] LEFT_ARROW  = new boolean[4][7];
+    private static final boolean[][] RIGHT_ARROW = new boolean[4][7];
+
+    static {
+        // Left-pointing ◄: tip at px=0, row py=3
+        for (int[] p : new int[][]{
+                {3,0},
+                {2,1},{3,1},
+                {1,2},{2,2},{3,2},
+                {0,3},{1,3},{2,3},{3,3},
+                {1,4},{2,4},{3,4},
+                {2,5},{3,5},
+                {3,6}})
+            LEFT_ARROW[p[0]][p[1]] = true;
+        // Right-pointing ►: tip at px=3, row py=3
+        for (int[] p : new int[][]{
+                {0,0},
+                {0,1},{1,1},
+                {0,2},{1,2},{2,2},
+                {0,3},{1,3},{2,3},{3,3},
+                {0,4},{1,4},{2,4},
+                {0,5},{1,5},
+                {0,6}})
+            RIGHT_ARROW[p[0]][p[1]] = true;
+    }
+
     private final EntityPlayer player;
     private final IBaublesItemHandler baublesHandler = ((ContainerPlayerExpanded) this.inventorySlots).baubles;
     protected GuiButtonImage recipeBook;
     protected GuiButton cosButton, cosToggleButton;
-    protected GuiSlotButton up, down;
     private float oldMouseX, oldMouseY;
+    private int baublePage = 0;
 
     public GuiPlayerExpanded(EntityPlayer player) {
         super(new ContainerPlayerExpanded(player.inventory, player));
@@ -93,27 +131,53 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
     }
 
     private void resetGuiLeft() {
-        this.guiLeft = (this.width - this.xSize) / 2;
+        int centeredGuiLeft = (this.width - this.xSize) / 2;
+        int columns = Math.min(this.getBaubleColumnCount(), MAX_VISIBLE_BAUBLE_COLUMNS);
+        int leftWidth = columns > 0 ? 28 + ((columns - 1) * BAUBLE_COLUMN_STEP) : 0;
+        int leftMostBaublePanelX = centeredGuiLeft - leftWidth;
+        int minLeftPadding = 4;
+        int shiftRight = Math.max(0, minLeftPadding - leftMostBaublePanelX);
+
+        this.guiLeft = centeredGuiLeft + shiftRight;
+        this.updateExtraButtonPositions();
+    }
+
+    private int getBaubleColumnCount() {
+        int maxSlots = this.getRealBaubleSlots();
+        if (maxSlots <= 0) return 0;
+        int maxRowsPerColumn = this.getActualMaxBaubleSlots();
+        return (maxSlots + maxRowsPerColumn - 1) / maxRowsPerColumn;
+    }
+
+    private void updateExtraButtonPositions() {
+        if (this.recipeBook != null) {
+            this.recipeBook.x = this.guiLeft + 104;
+            this.recipeBook.y = this.height / 2 - 22;
+        }
+
+        if (this.cosButton != null) {
+            this.cosButton.x = this.guiLeft + ModConfigs.CosArmorGuiButton_Left;
+            this.cosButton.y = this.guiTop + ModConfigs.CosArmorGuiButton_Top;
+        }
+
+        if (this.cosToggleButton != null) {
+            this.cosToggleButton.x = this.guiLeft + ModConfigs.CosArmorToggleButton_Left;
+            this.cosToggleButton.y = this.guiTop + ModConfigs.CosArmorToggleButton_Top;
+        }
     }
 
     @Override
     public void updateScreen() {
+        this.clampBaublePage();
         updateActivePotionEffects();
         resetGuiLeft();
+        this.updateBaubleSlotPositions();
     }
 
     @Override
     public void initGui() {
         this.buttonList.clear();
         super.initGui();
-        this.up = new GuiSlotButton(56, this, guiLeft - 26, guiTop - 9, 27, 14, false);
-        this.down = new GuiSlotButton(57, this, guiLeft - 26, guiTop + 7 + getMaxY(), 27, 14, true);
-
-        this.up.visible = this.getRealBaubleSlots() > this.getActualMaxBaubleSlots();
-        this.down.visible = this.up.visible;
-
-        this.buttonList.add(this.up);
-        this.buttonList.add(this.down);
 
         if (ENABLE_RECIPE_BOOK) {
             this.initRecipeBook();
@@ -126,7 +190,9 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
             this.buttonList.add(this.cosToggleButton);
         }
 
+        this.clampBaublePage();
         resetGuiLeft();
+        this.updateBaubleSlotPositions();
     }
 
     private void initRecipeBook() {
@@ -167,57 +233,36 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
     @Override
     protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
         this.fontRenderer.drawString(I18n.format("container.crafting"), 97, 8, 4210752);
-        int xLoc = this.guiLeft - 24;
-        if (mouseX > xLoc && mouseX < xLoc + 19) {
-            int yLoc = this.guiTop + 5;
-            if (mouseY >= yLoc && mouseY < yLoc + getMaxY()) {
-                int slotIndex = (mouseY - yLoc) / 18;
-                BaublesContainer container = ((BaublesContainer) baublesHandler);
-
-                ItemStack stack = container.getStackInSlot(slotIndex);
-                if (!stack.isEmpty()) return;
-
-                SlotDefinition definition = container.getSlot(slotIndex);
-
-                if (definition != null) {
-
-                    FontRenderer renderer = Minecraft.getMinecraft().fontRenderer;
-                    GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-                    GlStateManager.enableBlend();
-                    GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
-                    GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-
-                    GlStateManager.pushMatrix();
-                    GlStateManager.translate(0, 0, 200);
-                    String str = I18n.format(definition.getTranslationKey(slotIndex));
-                    GuiUtils.drawHoveringText(Collections.singletonList(str), mouseX - this.guiLeft, mouseY - this.guiTop, width, height, 300, renderer);
-                    GlStateManager.popMatrix();
-                }
-            }
-        }
     }
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        this.clampBaublePage();
+        resetGuiLeft();
+        this.updateBaubleSlotPositions();
         this.drawDefaultBackground();
         this.oldMouseX = (float) mouseX;
         this.oldMouseY = (float) mouseY;
         super.drawScreen(mouseX, mouseY, partialTicks);
+        if (this.getRealBaubleSlots() > 0) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(0.0F, 0.0F, 300.0F);
+            this.drawBaubleBackgroundAndPageButtons();
+            GlStateManager.popMatrix();
+
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(0.0F, 0.0F, 301.0F);
+            this.drawBaubleSlotsOnTop();
+            GlStateManager.popMatrix();
+        }
+        this.drawCarriedItemOnTop(mouseX, mouseY);
         this.renderHoveredToolTip(mouseX, mouseY);
+        this.drawHoveredBaubleSlotTypeTooltip(mouseX, mouseY);
     }
 
     @Override
     public void handleMouseInput() throws IOException {
         super.handleMouseInput();
-        if (this.getRealBaubleSlots() <= this.getActualMaxBaubleSlots()) return;
-        if (ModCompatibility.MT$shouldScroll(this.getSlotUnderMouse())) {
-            int dWheel = Mouse.getEventDWheel();
-            if (dWheel != 0) {
-                int value = -(dWheel / 120);
-                PacketHandler.INSTANCE.sendToServer(new PacketChangeOffset(value));
-                ((BaublesContainer) baublesHandler).incrOffset(value);
-            }
-        }
     }
 
     @Override
@@ -230,31 +275,139 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
 
         this.drawTexturedModalRect(k, l, 0, 0, this.xSize, this.ySize);
 
-        int maxSlots = Math.min(this.getRealBaubleSlots(), this.getActualMaxBaubleSlots());
+        GuiInventory.drawEntityOnScreen(k + 51, l + 75, 30, (float) (k + 51) - this.oldMouseX, (float) (l + 75 - 50) - this.oldMouseY, this.mc.player);
+    }
 
-        if (maxSlots > 0) {
-            if (maxSlots == 1) {
-                this.drawTexturedModalRect(k - 28, l, 176, 34, 28, 28);
+    private void drawBaubleBackgroundAndPageButtons() {
+        RenderHelper.disableStandardItemLighting();
+        GlStateManager.disableLighting();
+        GlStateManager.disableDepth();
+        GlStateManager.enableBlend();
+        GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
+        GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        this.mc.getTextureManager().bindTexture(background);
+
+        int k = this.guiLeft;
+        int l = this.guiTop;
+        int maxSlots = this.getRealBaubleSlots();
+        if (maxSlots <= 0) return;
+
+        int maxRowsPerColumn = this.getActualMaxBaubleSlots();
+        int columns = (maxSlots + maxRowsPerColumn - 1) / maxRowsPerColumn;
+        int[] columnRows = new int[columns];
+        int startColumn = this.getVisibleBaubleStartColumn();
+        int endColumn = this.getVisibleBaubleEndColumnExclusive();
+
+        for (int column = 0; column < columns; column++) {
+            columnRows[column] = Math.min(maxRowsPerColumn, maxSlots - (column * maxRowsPerColumn));
+        }
+
+        for (int column = startColumn; column < endColumn; column++) {
+            int visibleColumn = column - startColumn;
+            int x = k - 28 - (visibleColumn * BAUBLE_COLUMN_STEP);
+            int rows = columnRows[column];
+
+            if (rows == 1) {
+                boolean leftNeighborHasRow = column + 1 < columns && 0 < columnRows[column + 1];
+                boolean rightNeighborHasRow = column - 1 >= 0 && 0 < columnRows[column - 1];
+                this.drawBaubleColumnPart(x, l, 34, 28, !leftNeighborHasRow, !rightNeighborHasRow);
+                continue;
             }
-            else {
-                for (int i = 0; i < maxSlots; i++) {
-                    int textureY = 39;
-                    int height = 20;
-                    int y = l + (i * 18);
 
-                    if (i == 0) {
-                        textureY = 34;
-                        height += 4;
-                    }
-                    else y += 5;
-                    if (i == maxSlots - 1) height += 4;
+            for (int i = 0; i < rows; i++) {
+                int textureY = 39;
+                int height = 20;
+                int y = l + (i * 18);
 
-                    this.drawTexturedModalRect(k - 28, y, 176, textureY, 28, height);
+                if (i == 0) {
+                    textureY = 34;
+                    height += 4;
                 }
+                else y += 5;
+                if (i == rows - 1) height += 4;
+
+                boolean leftNeighborHasRow = column + 1 < endColumn && i < columnRows[column + 1];
+                boolean rightNeighborHasRow = column - 1 >= startColumn && i < columnRows[column - 1];
+
+                this.drawBaubleColumnPart(x, y, textureY, height, !leftNeighborHasRow, !rightNeighborHasRow);
             }
         }
 
-        GuiInventory.drawEntityOnScreen(k + 51, l + 75, 30, (float) (k + 51) - this.oldMouseX, (float) (l + 75 - 50) - this.oldMouseY, this.mc.player);
+        this.drawBaublePageButtons();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.enableDepth();
+        GlStateManager.disableBlend();
+    }
+
+    private void drawBaubleSlotsOnTop() {
+        GlStateManager.pushMatrix();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.translate((float) this.guiLeft, (float) this.guiTop, 0.0F);
+        for (Slot slot : this.inventorySlots.inventorySlots) {
+            if (!(slot instanceof SlotBauble)) continue;
+            if (slot.xPos < -999 || slot.yPos < -999) continue;
+
+            ItemStack stack = slot.getStack();
+
+            TextureAtlasSprite sprite = slot.getBackgroundSprite();
+            if (stack.isEmpty() && sprite != null) {
+                GlStateManager.disableLighting();
+                this.mc.getTextureManager().bindTexture(slot.getBackgroundLocation());
+                this.drawTexturedModalRect(slot.xPos, slot.yPos, sprite, 16, 16);
+                GlStateManager.enableLighting();
+            }
+
+            if (!stack.isEmpty()) {
+                GlStateManager.enableDepth();
+                this.itemRender.renderItemAndEffectIntoGUI(this.mc.player, stack, slot.xPos, slot.yPos);
+                this.itemRender.renderItemOverlayIntoGUI(this.fontRenderer, stack, slot.xPos, slot.yPos, null);
+            }
+        }
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.popMatrix();
+    }
+
+    private void drawHoveredBaubleSlotTypeTooltip(int mouseX, int mouseY) {
+        int slotIndex = this.getHoveredBaubleSlotIndex(mouseX, mouseY);
+        if (slotIndex < 0) return;
+
+        BaublesContainer container = ((BaublesContainer) baublesHandler);
+        ItemStack stack = container.getStackInSlot(slotIndex);
+        if (!stack.isEmpty()) return;
+
+        SlotDefinition definition = container.getSlot(slotIndex);
+        if (definition == null) return;
+
+        FontRenderer renderer = Minecraft.getMinecraft().fontRenderer;
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.enableBlend();
+        GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
+        GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(0, 0, 400);
+        String str = I18n.format(definition.getTranslationKey(slotIndex));
+        GuiUtils.drawHoveringText(Collections.singletonList(str), mouseX, mouseY, width, height, 300, renderer);
+        GlStateManager.popMatrix();
+    }
+
+    private void drawCarriedItemOnTop(int mouseX, int mouseY) {
+        ItemStack carried = this.mc.player.inventory.getItemStack();
+        if (carried.isEmpty()) return;
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(0.0F, 0.0F, 500.0F);
+        GlStateManager.enableDepth();
+        RenderHelper.enableGUIStandardItemLighting();
+        this.itemRender.zLevel = 300.0F;
+        this.zLevel = 300.0F;
+        this.itemRender.renderItemAndEffectIntoGUI(this.mc.player, carried, mouseX - 8, mouseY - 8);
+        this.itemRender.renderItemOverlayIntoGUI(this.fontRenderer, carried, mouseX - 8, mouseY - 8, null);
+        this.itemRender.zLevel = 0.0F;
+        this.zLevel = 0.0F;
+        RenderHelper.disableStandardItemLighting();
+        GlStateManager.popMatrix();
     }
 
     @Override
@@ -332,6 +485,214 @@ public class GuiPlayerExpanded extends InventoryEffectRenderer {
 
     public int getMaxY() {
         return 18 * Math.min(this.getRealBaubleSlots(), this.getActualMaxBaubleSlots());
+    }
+
+    private int getHoveredBaubleSlotIndex(int mouseX, int mouseY) {
+        int maxSlots = this.getRealBaubleSlots();
+        int maxRowsPerColumn = this.getActualMaxBaubleSlots();
+        int startColumn = this.getVisibleBaubleStartColumn();
+        int endColumn = this.getVisibleBaubleEndColumnExclusive();
+
+        for (int slotIndex = 0; slotIndex < maxSlots; slotIndex++) {
+            int column = slotIndex / maxRowsPerColumn;
+            int row = slotIndex % maxRowsPerColumn;
+
+            if (column < startColumn || column >= endColumn) continue;
+
+            int visibleColumn = column - startColumn;
+
+            int xLoc = this.guiLeft - 24 - (visibleColumn * BAUBLE_COLUMN_STEP);
+            int yLoc = this.guiTop + 5 + (row * 18);
+
+            if (mouseX > xLoc && mouseX < xLoc + 19 && mouseY >= yLoc && mouseY < yLoc + 18) {
+                return slotIndex;
+            }
+        }
+
+        return -1;
+    }
+
+    @Override
+    protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        super.mouseClicked(mouseX, mouseY, mouseButton);
+
+        if (mouseButton != 0) return;
+        int pages = this.getBaublePageCount();
+        if (pages <= 1) return;
+
+        int buttonsY = this.getPageButtonsY();
+        int leftButtonX = this.getPageLeftButtonX();
+        int rightButtonX = this.getPageRightButtonX();
+
+        if (mouseX >= leftButtonX && mouseX < leftButtonX + PAGE_BUTTON_W && mouseY >= buttonsY && mouseY < buttonsY + PAGE_BUTTON_H) {
+            if (this.baublePage > 0) {
+                this.baublePage--;
+                this.updateBaubleSlotPositions();
+            }
+            return;
+        }
+
+        if (mouseX >= rightButtonX && mouseX < rightButtonX + PAGE_BUTTON_W && mouseY >= buttonsY && mouseY < buttonsY + PAGE_BUTTON_H) {
+            if (this.baublePage < pages - 1) {
+                this.baublePage++;
+                this.updateBaubleSlotPositions();
+            }
+        }
+    }
+
+    private int getBaublePageCount() {
+        int columns = this.getBaubleColumnCount();
+        if (columns <= 0) return 1;
+        return (columns + MAX_VISIBLE_BAUBLE_COLUMNS - 1) / MAX_VISIBLE_BAUBLE_COLUMNS;
+    }
+
+    private int getVisibleBaubleStartColumn() {
+        return this.baublePage * MAX_VISIBLE_BAUBLE_COLUMNS;
+    }
+
+    private int getVisibleBaubleEndColumnExclusive() {
+        int columns = this.getBaubleColumnCount();
+        return Math.min(columns, this.getVisibleBaubleStartColumn() + MAX_VISIBLE_BAUBLE_COLUMNS);
+    }
+
+    private void clampBaublePage() {
+        int pages = this.getBaublePageCount();
+        if (this.baublePage < 0) this.baublePage = 0;
+        if (this.baublePage >= pages) this.baublePage = pages - 1;
+    }
+
+    private void updateBaubleSlotPositions() {
+        int maxRowsPerColumn = this.getActualMaxBaubleSlots();
+        int startColumn = this.getVisibleBaubleStartColumn();
+        int endColumn = this.getVisibleBaubleEndColumnExclusive();
+
+        for (Slot slot : this.inventorySlots.inventorySlots) {
+            if (slot instanceof SlotBauble) {
+                int slotIndex = slot.getSlotIndex();
+                int column = slotIndex / maxRowsPerColumn;
+                int row = slotIndex % maxRowsPerColumn;
+
+                if (column >= startColumn && column < endColumn) {
+                    int visibleColumn = column - startColumn;
+                    slot.xPos = -22 - (visibleColumn * BAUBLE_COLUMN_STEP);
+                    slot.yPos = 6 + (row * 18);
+                } else {
+                    slot.xPos = -10000;
+                    slot.yPos = -10000;
+                }
+            }
+        }
+    }
+
+    private int getRightmostVisibleBaubleBottomY() {
+        int maxRowsPerColumn = this.getActualMaxBaubleSlots();
+        int startColumn = this.getVisibleBaubleStartColumn();
+        int maxSlots = this.getRealBaubleSlots();
+        int remaining = maxSlots - (startColumn * maxRowsPerColumn);
+        int rows = Math.min(maxRowsPerColumn, Math.max(0, remaining));
+        if (rows <= 0) return this.guiTop;
+        if (rows == 1) return this.guiTop + 28;
+        return this.guiTop + ((rows - 1) * 18) + 29;
+    }
+
+    private int getPageButtonsStartX() {
+        int rightmostColumnX = this.guiLeft - 28;
+        int totalWidth = PAGE_BUTTON_W * 2 + PAGE_BUTTON_GAP;
+        return rightmostColumnX + (28 - totalWidth) / 2;
+    }
+
+    private int getPageLeftButtonX() {
+        return this.getPageButtonsStartX();
+    }
+
+    private int getPageRightButtonX() {
+        return this.getPageButtonsStartX() + PAGE_BUTTON_W + PAGE_BUTTON_GAP;
+    }
+
+    private int getPageButtonsY() {
+        return this.getRightmostVisibleBaubleBottomY() + PAGE_BUTTON_TOP_GAP;
+    }
+
+    private void drawBaublePageButtons() {
+        int pages = this.getBaublePageCount();
+        if (pages <= 1) return;
+
+        int y = this.getPageButtonsY();
+        int leftX = this.getPageLeftButtonX();
+        int rightX = this.getPageRightButtonX();
+        int mouseX = (int) this.oldMouseX;
+        int mouseY = (int) this.oldMouseY;
+
+        boolean canPrev = this.baublePage > 0;
+        boolean canNext = this.baublePage < pages - 1;
+        boolean hoverPrev = canPrev && this.isMouseWithin(mouseX, mouseY, leftX, y, PAGE_BUTTON_W, PAGE_BUTTON_H);
+        boolean hoverNext = canNext && this.isMouseWithin(mouseX, mouseY, rightX, y, PAGE_BUTTON_W, PAGE_BUTTON_H);
+
+        int iconColor         = 0xFFC6C6C6;
+        int hoverIconColor    = 0xFF7D87BE;
+        int disabledIconColor = 0xFF444444;
+
+        int prevColor = !canPrev ? disabledIconColor : (hoverPrev ? hoverIconColor : iconColor);
+        int nextColor = !canNext ? disabledIconColor : (hoverNext ? hoverIconColor : iconColor);
+
+        this.drawLeftArrowIcon(leftX, y, prevColor);
+        this.drawRightArrowIcon(rightX, y, nextColor);
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
+
+    private void drawLeftArrowIcon(int x, int y, int color) {
+        this.drawArrowIcon(x, y, LEFT_ARROW, color);
+    }
+
+    private void drawRightArrowIcon(int x, int y, int color) {
+        this.drawArrowIcon(x, y, RIGHT_ARROW, color);
+    }
+
+    /** Draws an arrow icon with a 1px black pixel-perfect outline. */
+    private void drawArrowIcon(int x, int y, boolean[][] fill, int color) {
+        int w = fill.length;
+        int h = fill[0].length;
+        int outline = 0xFF111111;
+        int[][] dirs = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        // Outline: for each fill pixel, paint neighbors that are NOT fill pixels
+        for (int px = 0; px < w; px++) {
+            for (int py = 0; py < h; py++) {
+                if (!fill[px][py]) continue;
+                for (int[] d : dirs) {
+                    int nx = px + d[0], ny = py + d[1];
+                    boolean neighborIsFill = nx >= 0 && nx < w && ny >= 0 && ny < h && fill[nx][ny];
+                    if (!neighborIsFill) {
+                        this.drawRect(x + nx, y + ny, x + nx + 1, y + ny + 1, outline);
+                    }
+                }
+            }
+        }
+        // Solid fill
+        for (int px = 0; px < w; px++) {
+            for (int py = 0; py < h; py++) {
+                if (fill[px][py]) {
+                    this.drawRect(x + px, y + py, x + px + 1, y + py + 1, color);
+                }
+            }
+        }
+    }
+
+
+    private boolean isMouseWithin(int mouseX, int mouseY, int x, int y, int width, int height) {
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+    }
+
+    private void drawBaubleColumnPart(int x, int y, int textureY, int height, boolean drawLeftBorder, boolean drawRightBorder) {
+        this.drawTexturedModalRect(x + BAUBLE_LEFT_BORDER_WIDTH, y, 180, textureY, BAUBLE_INTERIOR_WIDTH, height);
+
+        if (drawLeftBorder) {
+            this.drawTexturedModalRect(x, y, 176, textureY, BAUBLE_LEFT_BORDER_WIDTH, height);
+        }
+
+        if (drawRightBorder) {
+            this.drawTexturedModalRect(x + BAUBLE_LEFT_BORDER_WIDTH + BAUBLE_INTERIOR_WIDTH, y, 198, textureY, BAUBLE_RIGHT_BORDER_WIDTH, height);
+        }
     }
 
     public int getBaubleSlots() {

@@ -98,6 +98,7 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
         for (int i = (slots.length - 1); i > 0; i--) {
             SlotDefinition slotDefinition = slots[i];
             if (slotDefinition == addSlotDefinition) {
+                this.dropAndClearRemovedSlotStack(i);
                 this.slots[i] = null;
                 return true;
             }
@@ -107,7 +108,32 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
 
     @Override
     public void setSlot(int slot, SlotDefinition setSlotDefinition) {
+        if (slot >= 0 && slot < this.slots.length && this.slots[slot] != null && setSlotDefinition == null) {
+            this.dropAndClearRemovedSlotStack(slot);
+        }
         this.slots[slot] = setSlotDefinition;
+    }
+
+    private void dropAndClearRemovedSlotStack(int realSlotIndex) {
+        if (realSlotIndex < 0 || realSlotIndex >= this.stacks.length) return;
+
+        ItemStack removedStack = this.getStackNA(realSlotIndex);
+        if (removedStack.isEmpty()) return;
+
+        ItemStack stackToDrop = removedStack.copy();
+        this.stacks[realSlotIndex] = ItemStack.EMPTY;
+
+        if (this.player instanceof EntityPlayer && removedStack.hasCapability(BaublesCapabilities.CAPABILITY_ITEM_BAUBLE, null)) {
+            IBauble bauble = removedStack.getCapability(BaublesCapabilities.CAPABILITY_ITEM_BAUBLE, null);
+            if (bauble != null) {
+                bauble.onUnequipped(removedStack, (EntityPlayer) this.player);
+            }
+        }
+
+        if (this.player != null && this.player.world != null && !this.player.world.isRemote) {
+            EntityItem eItem = new EntityItem(this.player.world, this.player.posX, this.player.posY, this.player.posZ, stackToDrop);
+            this.player.world.spawnEntity(eItem);
+        }
     }
 
     // TODO Find a way to use without casting.
@@ -169,8 +195,31 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
         if (stack == null || stack.isEmpty()) return false;
         IBauble bauble = stack.getCapability(BaublesCapabilities.CAPABILITY_ITEM_BAUBLE, null);
         if (bauble != null) {
+            if (isDuplicateBaubleBlocked(slot, stack)) return false;
             return bauble.canUnequip(stack, entity) && this.getSlot(slot).canPutItem(slot, stack);
         }
+        return false;
+    }
+
+    private boolean isDuplicateBaubleBlocked(int slot, @Nonnull ItemStack stack) {
+        if (!Config.preventDuplicateBaubles) return false;
+        ResourceLocation itemId = stack.getItem().getRegistryName();
+        if (itemId == null) return false;
+        String itemIdStr = itemId.toString();
+        if (Config.isDuplicateBaubleWhitelisted(itemIdStr)) return false;
+
+        int targetSlot = validateSlotIndex(slot);
+        if (targetSlot == -1) return false;
+        int targetRealSlot = getSlotIndex(targetSlot);
+
+        for (int i = 0; i < this.slots.length; i++) {
+            if (this.slots[i] == null || i == targetRealSlot) continue;
+            ItemStack existing = getStackNA(i);
+            if (existing.isEmpty()) continue;
+            ResourceLocation existingId = existing.getItem().getRegistryName();
+            if (existingId != null && itemId.equals(existingId)) return true;
+        }
+
         return false;
     }
 
@@ -186,8 +235,7 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
 
     @Override
     public int getSlots() {
-//        return getRealBaubleSlots();
-        return this.stacks.length;
+        return getRealBaubleSlots();
     }
 
     @Nonnull
@@ -325,38 +373,46 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
         for (int i = 0; i < slots.length; i++) {
             SlotDefinition slotDefinition = slots[i];
             NBTTagCompound slotTag = new NBTTagCompound();
+            slotTag.setInteger("Index", i);
             if (slotDefinition != null) {
                 slotTag.setString("Slot", slotDefinition.getTranslationKey(i).replace("baubles.type.", ""));
-                list1.appendTag(slotTag);
+            } else {
+                slotTag.setString("Slot", "null");
             }
+            list1.appendTag(slotTag);
         }
         NBTTagCompound compound = new NBTTagCompound();
         compound.setTag("Items", list);
         compound.setTag("SlotDefinition", list1);
+        compound.setString("SlotsConfigSignature", getSlotsConfigSignature());
         return compound;
     }
 
     @Override
     public void deserializeNBT(NBTTagCompound nbt) {
+        String savedSignature = nbt.getString("SlotsConfigSignature");
+        boolean restoreSlotDefinitions = !savedSignature.isEmpty() && savedSignature.equals(getSlotsConfigSignature());
 
-        //SlotDefinition
-        NBTTagList list1 = nbt.getTagList("SlotDefinition", Constants.NBT.TAG_COMPOUND);
-        int oldSlotNum = 0;
-        for (int i = 0; i < list1.tagCount(); i++) {
-            NBTTagCompound slotTag = list1.getCompoundTagAt(i);
-            String slot = slotTag.getString("Slot");
+        if (restoreSlotDefinitions) {
+            NBTTagList list1 = nbt.getTagList("SlotDefinition", Constants.NBT.TAG_COMPOUND);
+            for (int i = 0; i < list1.tagCount(); i++) {
+                NBTTagCompound slotTag = list1.getCompoundTagAt(i);
+                int slotIndex = slotTag.hasKey("Index", Constants.NBT.TAG_INT) ? slotTag.getInteger("Index") : i;
+                if (slotIndex < 0 || slotIndex >= this.slots.length) continue;
 
-            if (slot != "null") {
+                String slot = slotTag.getString("Slot");
+                if ("null".equals(slot)) {
+                    this.slots[slotIndex] = null;
+                    continue;
+                }
+
                 ResourceLocation location;
                 if (!slot.contains(":")) location = new ResourceLocation(Baubles.MODID, slot);
                 else location = new ResourceLocation(slot);
-                SlotDefinition definition = SlotDefinitions.get(location);
 
-                if (definition == null) {
-                    slots[i] = SlotDefinitions.get(new ResourceLocation(Baubles.MODID, "trinket"));
-                } else {
-                    slots[i] = definition;
-                    oldSlotNum++;
+                SlotDefinition definition = SlotDefinitions.get(location);
+                if (definition != null) {
+                    this.slots[slotIndex] = definition;
                 }
             }
         }
@@ -382,6 +438,14 @@ public class BaublesContainer implements IBaublesItemHandler, INBTSerializable<N
             else itemsToPuke.add(new ItemStack(stackTag));
         }
         if (!itemsToPuke.isEmpty()) this.itemsToPuke = itemsToPuke.toArray(new ItemStack[0]);
+    }
+
+    private String getSlotsConfigSignature() {
+        try {
+            return Config.readFile(Config.JSON_DIR).replaceAll("\\s+", "");
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private SlotDefinition[] getDefaultSlots() {

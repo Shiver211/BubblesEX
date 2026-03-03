@@ -63,9 +63,11 @@ public class ContainerPlayerExpanded extends Container {
             });
         }
 
-        //这
-        for (int i = 0; i < Math.min(getRealBaubleSlots(baubles), this.getActualMaxBaubleSlots()); i++) {
-            this.addSlotToContainer(new SlotBauble(player, baubles, i, -22,  6 + (i * 18)));
+        int baubleSlotCount = getRealBaubleSlots(baubles);
+        for (int i = 0; i < baubleSlotCount; i++) {
+            int column = i / this.getActualMaxBaubleSlots();
+            int row = i % this.getActualMaxBaubleSlots();
+            this.addSlotToContainer(new SlotBauble(player, baubles, i, -22 - (column * 18), 6 + (row * 18)));
         }
 
         for (int i = 0; i < 3; ++i) {
@@ -125,7 +127,7 @@ public class ContainerPlayerExpanded extends Container {
 
             EntityEquipmentSlot entityequipmentslot = EntityLiving.getSlotForItemStack(itemstack);
 
-            int slotShift = Math.min(8, baubles.getSlots());
+            int slotShift = getRealBaubleSlots(baubles);
 
             if (index == 0) {
                 if (!this.mergeItemStack(itemstack1, 9 + slotShift, 45 + slotShift, true)) {
@@ -166,7 +168,7 @@ public class ContainerPlayerExpanded extends Container {
                     BaublesContainer container = (BaublesContainer) baubles;
 
                     boolean check = true;
-                    for (int i = 0; i < Math.min(getRealBaubleSlots(baubles), this.getActualMaxBaubleSlots()); i++) {
+                    for (int i = 0; i < getRealBaubleSlots(baubles); i++) {
                         if (container.isItemValidForSlot(i, itemstack1, playerIn)) {
                             if (!mergeBauble(itemstack1, i)) {
                                 check = false;
@@ -246,8 +248,6 @@ public class ContainerPlayerExpanded extends Container {
                     itemstack.setCount(maxSize);
                     flag = true;
                 }
-
-                container.changeOffsetBasedOnSlot(slotIndex);
             }
 
             else if (itemstack.isEmpty() && slot.canPutItem(slotIndex, stack)) {
@@ -257,8 +257,6 @@ public class ContainerPlayerExpanded extends Container {
                 else {
                     container.setStackInSlot(slotIndex, stack.splitStack(stack.getCount()));
                 }
-
-                container.changeOffsetBasedOnSlot(slotIndex);
                 flag = true;
             }
         }
